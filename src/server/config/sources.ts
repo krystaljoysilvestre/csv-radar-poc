@@ -5,12 +5,16 @@ export interface NewsFeed {
 
 const defaultNewsFeeds: NewsFeed[] = [
   {
-    name: "BBC News: Asia",
-    url: "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
+    name: "Rappler: Top Stories",
+    url: "https://www.rappler.com/feeds/latest",
   },
   {
-    name: "Al Jazeera: News",
-    url: "https://www.aljazeera.com/xml/rss/all.xml",
+    name: "Philippine Daily Inquirer: Nation",
+    url: "https://feed.inquirer.net/latest",
+  },
+  {
+    name: "GMA News: Philippines",
+    url: "https://www.gmanetwork.com/news/feed/",
   },
 ];
 

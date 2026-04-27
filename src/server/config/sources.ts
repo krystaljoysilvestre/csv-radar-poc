@@ -5,12 +5,12 @@ export interface NewsFeed {
 
 const defaultNewsFeeds: NewsFeed[] = [
   {
-    name: "Google News: Philippines Energy Policy",
-    url: "https://news.google.com/rss/search?q=Philippines%20energy%20policy&hl=en-PH&gl=PH&ceid=PH:en",
+    name: "BBC News: Asia",
+    url: "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
   },
   {
-    name: "Google News: DOE ERC Philippines",
-    url: "https://news.google.com/rss/search?q=DOE%20ERC%20Philippines%20energy&hl=en-PH&gl=PH&ceid=PH:en",
+    name: "Al Jazeera: News",
+    url: "https://www.aljazeera.com/xml/rss/all.xml",
   },
 ];
 

@@ -13,7 +13,7 @@ import { runNewsPhase } from "./phases/news.js";
 import { runPolicyPhase } from "./phases/policy.js";
 
 const app = express();
-const port = 8787;
+const port = Number(process.env.PORT) || 8787;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientDist = path.resolve(__dirname, "../../client");

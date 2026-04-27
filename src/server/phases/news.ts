@@ -6,6 +6,8 @@ import type {
   SourceHealth,
 } from "../../shared/types.js";
 import { newsFeeds } from "../config/sources.js";
+import { readDataJson, writeDataJson } from "../lib/files.js";
+import { timedFetchWithRetry } from "../lib/http.js";
 import { createId, summarizeText, uniqueBy } from "../lib/utils.js";
 
 const parser = new Parser();
@@ -49,18 +51,47 @@ export async function runNewsPhase(state: DashboardState) {
   let totalFetched = 0;
 
   for (const feed of newsFeeds) {
-    const sourceStarted = performance.now();
     try {
-      const parsed = await parser.parseURL(feed.url);
-      const items = parsed.items.slice(0, 12);
+      const { response, durationMs, attempts } = await timedFetchWithRetry(
+        feed.url,
+        {
+          headers: {
+            accept: "application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.8",
+          },
+        },
+        {
+          retries: 2,
+          baseDelayMs: 450,
+        },
+      );
+
+      if (!response.ok) {
+        phaseHealth.push({
+          name: feed.name,
+          url: feed.url,
+          ok: false,
+          statusCode: response.status,
+          durationMs,
+          notes: [`Status code ${response.status} after ${attempts} attempt(s)`],
+        });
+        continue;
+      }
+
+      const xml = await response.text();
+      const parsed = await parser.parseString(xml);
+      const items = (parsed.items ?? []).slice(0, 12);
       totalFetched += items.length;
 
       phaseHealth.push({
         name: feed.name,
         url: feed.url,
         ok: true,
-        durationMs: Math.round(performance.now() - sourceStarted),
-        notes: [`${items.length} items parsed from RSS feed`],
+        statusCode: response.status,
+        durationMs,
+        notes: [
+          `${items.length} items parsed from RSS feed`,
+          `Completed in ${attempts} attempt(s)`,
+        ],
       });
 
       for (const item of items) {
@@ -91,7 +122,7 @@ export async function runNewsPhase(state: DashboardState) {
         name: feed.name,
         url: feed.url,
         ok: false,
-        durationMs: Math.round(performance.now() - sourceStarted),
+        durationMs: 0,
         notes: [
           error instanceof Error ? error.message : "Unknown feed failure",
         ],
@@ -100,6 +131,16 @@ export async function runNewsPhase(state: DashboardState) {
   }
 
   const articles = uniqueBy(rawArticles, (article) => article.dedupeKey);
+  const cachedArticles = await readDataJson<NewsArticle[]>(
+    "last-good-news.json",
+    [],
+  );
+  const usingCachedArticles = !articles.length && cachedArticles.length > 0;
+  const displayArticles = usingCachedArticles ? cachedArticles : articles;
+
+  if (articles.length > 0) {
+    await writeDataJson("last-good-news.json", articles);
+  }
 
   const failedSources = phaseHealth.filter((source) => !source.ok).length;
   if (failedSources > 0) {
@@ -126,19 +167,32 @@ export async function runNewsPhase(state: DashboardState) {
     });
   }
 
+  if (usingCachedArticles) {
+    blockers.push({
+      title: "Using cached news snapshot",
+      severity: "low",
+      summary:
+        "Live feed fetch returned zero items, so the last successful news snapshot was used.",
+      impact:
+        "Dashboard data remains available but may lag behind real-time updates.",
+      mitigation:
+        "Add alternate non-Google feeds via NEWS_FEEDS and rerun to refresh live data.",
+    });
+  }
+
   const durationMs = phaseHealth.reduce(
     (total, item) => total + item.durationMs,
     0,
   );
   const markdown = buildNewsFindingsMarkdown(
-    articles,
+    displayArticles,
     phaseHealth,
     blockers,
     durationMs,
     totalFetched,
   );
 
-  state.newsArticles = articles;
+  state.newsArticles = displayArticles;
   state.sourceHealth = [
     ...state.sourceHealth.filter(
       (item) => !newsFeeds.some((feed) => feed.url === item.url),
@@ -152,8 +206,10 @@ export async function runNewsPhase(state: DashboardState) {
     startedAt,
     completedAt: new Date().toISOString(),
     durationMs,
-    itemCount: articles.length,
-    summary: `Fetched ${totalFetched} feed items and stored ${articles.length} unique articles across ${phaseHealth.length} sources.`,
+    itemCount: displayArticles.length,
+    summary: usingCachedArticles
+      ? `Fetched ${totalFetched} live feed items. Falling back to ${displayArticles.length} cached articles across ${phaseHealth.length} sources.`
+      : `Fetched ${totalFetched} feed items and stored ${displayArticles.length} unique articles across ${phaseHealth.length} sources.`,
     blockers,
   };
 

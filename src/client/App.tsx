@@ -199,18 +199,12 @@ export default function App() {
   const newsStatus = newsReliability >= 75 ? "Ready" : "Needs improvements";
   const policyStatus =
     policyReliability >= 65 ? "Reliable enough" : "Partially reliable";
-  const decisionStatus =
-    newsReliability >= 80 && policyReliability >= 55
-      ? "Go"
-      : newsReliability >= 70 && policyReliability >= 35
-        ? "Conditional Go"
-        : "Hold";
-  const decisionTone =
-    decisionStatus === "Go"
-      ? "decision-go"
-      : decisionStatus === "Conditional Go"
-        ? "decision-conditional"
-        : "decision-hold";
+  const formattedGeneratedAt = state.generatedAt
+    ? new Date(state.generatedAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "not run yet";
 
   const reportContent = state.artifacts[activeReport];
 
@@ -275,12 +269,6 @@ export default function App() {
             </p>
             <p>
               <strong>Policy Monitoring:</strong> {policyStatus}
-            </p>
-            <p>
-              <strong>Decision:</strong>{" "}
-              <span className={`decision-pill ${decisionTone}`}>
-                {decisionStatus}
-              </span>
             </p>
           </div>
         </div>
@@ -431,7 +419,7 @@ export default function App() {
           <div className="panel-head">
             <h2>Coverage scorecards</h2>
             <span className="muted">
-              Last update: {state.generatedAt ?? "not run yet"}
+              Last update: {formattedGeneratedAt}
             </span>
           </div>
           <div className="score-grid">
